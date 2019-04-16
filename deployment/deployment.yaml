@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-analyzer-config
+  labels:
+    app: data-analyzer
+data:
+  application.yml: |
+    server:
+      port: 8080
+      servlet:
+        context-path: /data-analyzer
+        
+    spring.jpa:
+      database: POSTGRESQL
+      hibernate:
+       ddl-auto: create-drop
+      show-sql: true
+    
+    spring.datasource:
+      platform: postgres
+      driverClassName: org.postgresql.Driver
+      url: jdbc:postgresql://localhost:5432/postgres
+      username: postgres
+      password: postgres
+      
+    app-config:
+      env: local under namespace
+---     
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: data-analyzer
+  labels:
+    app: data-analyzer
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: data-analyzer
+  template:
+    metadata:
+      labels:
+        app: data-analyzer
+    spec:
+      volumes:
+        - name: config
+          configMap:
+            name: data-analyzer-config
+      containers:
+        - name: data-analyzer
+          image: docker.apple.com/gbi-fw/data-analyzer:1.0.1
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+                memory: 256Mi
+                cpu: 100m
+            limits:
+                memory: 256Mi
+                cpu: 100m
+          volumeMounts:
+            - name: config
+              mountPath: /app/application.yml
+              subPath: application.yml
+      restartPolicy: Always
+  
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: data-analyzer
+  labels:
+    app: data-analyzer
+spec:
+  selector:
+    app: data-analyzer
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
